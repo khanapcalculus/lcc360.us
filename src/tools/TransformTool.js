@@ -1,6 +1,9 @@
-export default class TransformTool {
+export default class LassoTool {
   constructor(context) {
     this.context = context;
+    this.isDrawing = false;
+    this.lassoPoints = [];
+    this.lassoLine = null;
   }
 
   // Helper function to get transformed mouse position accounting for pan and zoom
@@ -16,64 +19,239 @@ export default class TransformTool {
     return { x: transformedX, y: transformedY };
   }
 
+  // Check if a point is inside a polygon using ray casting algorithm
+  isPointInPolygon(point, polygon) {
+    const x = point.x;
+    const y = point.y;
+    let inside = false;
+
+    for (let i = 0, j = polygon.length - 2; i < polygon.length; j = i, i += 2) {
+      const xi = polygon[i];
+      const yi = polygon[i + 1];
+      const xj = polygon[j];
+      const yj = polygon[j + 1];
+
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+
+    return inside;
+  }
+
+  // Check if an element is inside the lasso selection
+  isElementInLasso(element, lassoPoints) {
+    if (lassoPoints.length < 6) return false; // Need at least 3 points (6 coordinates)
+
+    switch (element.type) {
+      case 'rectangle':
+        // Check if all corners of the rectangle are inside the lasso
+        const corners = [
+          { x: element.x, y: element.y },
+          { x: element.x + element.width, y: element.y },
+          { x: element.x + element.width, y: element.y + element.height },
+          { x: element.x, y: element.y + element.height }
+        ];
+        return corners.every(corner => this.isPointInPolygon(corner, lassoPoints));
+
+      case 'circle':
+        // Check if the circle center is inside and the circle doesn't extend outside
+        const center = { x: element.x, y: element.y };
+        if (!this.isPointInPolygon(center, lassoPoints)) return false;
+        
+        // Check if circle edges are inside (simplified check)
+        const edgePoints = [
+          { x: element.x + element.radius, y: element.y },
+          { x: element.x - element.radius, y: element.y },
+          { x: element.x, y: element.y + element.radius },
+          { x: element.x, y: element.y - element.radius }
+        ];
+        return edgePoints.every(point => this.isPointInPolygon(point, lassoPoints));
+
+      case 'line':
+        // Check if all line points are inside the lasso
+        const linePoints = [];
+        for (let i = 0; i < element.points.length; i += 2) {
+          linePoints.push({ x: element.points[i], y: element.points[i + 1] });
+        }
+        return linePoints.some(point => this.isPointInPolygon(point, lassoPoints));
+
+      case 'text':
+        // Check if text position is inside the lasso
+        return this.isPointInPolygon({ x: element.x, y: element.y }, lassoPoints);
+
+      case 'image':
+        // Check if all corners of the image are inside the lasso
+        const imageCorners = [
+          { x: element.x, y: element.y },
+          { x: element.x + element.width, y: element.y },
+          { x: element.x + element.width, y: element.y + element.height },
+          { x: element.x, y: element.y + element.height }
+        ];
+        return imageCorners.every(corner => this.isPointInPolygon(corner, lassoPoints));
+
+      default:
+        return false;
+    }
+  }
+
   onMouseDown(e) {
-    console.log('TransformTool onMouseDown', e.target);
+    console.log('LassoTool onMouseDown');
     
     // Don't interfere if clicking on transformer handles
     if (e.target.getClassName() === 'Transformer') {
-      console.log('TransformTool: clicked on transformer, letting it handle');
+      console.log('LassoTool: clicked on transformer, letting it handle');
       return;
     }
-    
+
     const { setSelectedElement, pages, currentPage } = this.context;
     const clickedOnEmpty = e.target === e.target.getStage();
     
-    if (clickedOnEmpty) {
-      console.log('TransformTool: clicked on empty area, deselecting');
-      setSelectedElement(null);
-      return;
-    }
-    
-    const id = e.target.id();
-    console.log('TransformTool: clicked on element with id:', id);
-    if (id) {
-      const currentPageElements = pages[currentPage] || [];
-      const element = currentPageElements.find(el => el.id === id);
-      if (element) {
-        console.log('TransformTool: selecting element:', element);
-        setSelectedElement(element);
-      } else {
-        console.log('TransformTool: element not found in current page');
+    // If clicking on an element without drawing, select it directly
+    if (!clickedOnEmpty && !this.isDrawing) {
+      const id = e.target.id();
+      console.log('LassoTool: clicked on element with id:', id);
+      if (id) {
+        const currentPageElements = pages[currentPage] || [];
+        const element = currentPageElements.find(el => el.id === id);
+        if (element) {
+          console.log('LassoTool: selecting element:', element);
+          setSelectedElement(element);
+          return;
+        }
       }
     }
+
+    // Start lasso drawing
+    const pos = this.getTransformedPointerPosition(e.target.getStage());
+    if (!pos) return;
+
+    this.isDrawing = true;
+    this.lassoPoints = [pos.x, pos.y];
+    
+    // Clear previous selection when starting new lasso
+    setSelectedElement(null);
+
+    // Create temporary lasso line for visual feedback
+    const newLassoLine = {
+      type: 'line',
+      id: 'temp-lasso-' + Date.now(),
+      points: this.lassoPoints,
+      stroke: '#007bff',
+      strokeWidth: 2,
+      lineCap: 'round',
+      lineJoin: 'round',
+      tension: 0.5,
+      dash: [5, 5], // Dashed line for lasso
+      globalCompositeOperation: 'source-over'
+    };
+
+    this.context.addElement(newLassoLine);
+    this.lassoLine = newLassoLine;
   }
 
   onMouseMove(e) {
-    // Don't interfere with transformer's mouse move
-    if (e.target.getClassName() === 'Transformer') {
-      return;
+    if (!this.isDrawing) return;
+
+    const stage = e.target.getStage();
+    const point = this.getTransformedPointerPosition(stage);
+    if (!point) return;
+
+    this.lassoPoints = [...this.lassoPoints, point.x, point.y];
+
+    // Update the temporary lasso line
+    if (this.lassoLine) {
+      const updatedLassoLine = {
+        ...this.lassoLine,
+        points: this.lassoPoints
+      };
+      this.context.updateElement(updatedLassoLine);
     }
-    // Transform is handled by Konva's Transformer component
   }
 
   onMouseUp(e) {
-    console.log('TransformTool onMouseUp');
-    // Don't interfere with transformer's mouse up
-    if (e.target.getClassName() === 'Transformer') {
-      return;
+    if (!this.isDrawing) return;
+
+    console.log('LassoTool onMouseUp - completing lasso selection');
+    this.isDrawing = false;
+
+    // Remove the temporary lasso line
+    if (this.lassoLine) {
+      this.context.deleteElement(this.lassoLine.id);
+      this.lassoLine = null;
     }
-    // Don't update here - let onTransformEnd handle it
+
+    // Close the lasso by connecting to the first point
+    if (this.lassoPoints.length >= 6) {
+      this.lassoPoints.push(this.lassoPoints[0], this.lassoPoints[1]);
+
+      // Find all elements inside the lasso
+      const { pages, currentPage, setSelectedElement } = this.context;
+      const currentPageElements = pages[currentPage] || [];
+      const selectedElements = currentPageElements.filter(element => 
+        element.id !== this.lassoLine?.id && // Exclude the lasso line itself
+        this.isElementInLasso(element, this.lassoPoints)
+      );
+
+      console.log('LassoTool: Found', selectedElements.length, 'elements in lasso');
+
+      if (selectedElements.length === 1) {
+        // If only one element is selected, select it for transformation
+        setSelectedElement(selectedElements[0]);
+      } else if (selectedElements.length > 1) {
+        // For multiple elements, we'll select the first one for now
+        // In the future, this could be enhanced to support multi-selection
+        setSelectedElement(selectedElements[0]);
+        console.log('LassoTool: Multiple elements selected, selecting first one:', selectedElements[0]);
+        
+        // Show a notification about multiple selection
+        this.showMultiSelectionNotification(selectedElements.length);
+      } else {
+        console.log('LassoTool: No elements found in lasso selection');
+      }
+    }
+
+    // Reset lasso points
+    this.lassoPoints = [];
+  }
+
+  showMultiSelectionNotification(count) {
+    // Show visual feedback for multiple selection
+    const notification = document.createElement('div');
+    notification.textContent = `${count} objects selected. Use Delete key or trash button to delete all.`;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.left = '50%';
+    notification.style.transform = 'translateX(-50%)';
+    notification.style.backgroundColor = 'rgba(59, 130, 246, 0.9)';
+    notification.style.color = 'white';
+    notification.style.padding = '12px 20px';
+    notification.style.borderRadius = '8px';
+    notification.style.zIndex = '10000';
+    notification.style.fontSize = '14px';
+    notification.style.fontFamily = 'Arial, sans-serif';
+    notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+    notification.style.animation = 'slideIn 0.3s ease-out';
+    
+    document.body.appendChild(notification);
+    
+    // Remove notification after 3 seconds
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 3000);
   }
 
   onTransformEnd(e) {
-    console.log('TransformTool onTransformEnd', e.target);
+    console.log('LassoTool onTransformEnd', e.target);
     const { selectedElement, updateElement, saveToHistory } = this.context;
     if (selectedElement) {
       const node = e.target;
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
       
-      console.log('TransformTool: transform end for element:', selectedElement.type);
+      console.log('LassoTool: transform end for element:', selectedElement.type);
       console.log('Node position:', node.x(), node.y());
       console.log('Node scale:', scaleX, scaleY);
       console.log('Node rotation:', node.rotation());
@@ -153,9 +331,18 @@ export default class TransformTool {
         node.scaleY(1);
         node.width(newWidth);
         node.height(newHeight);
+        
+      } else if (selectedElement.type === 'text') {
+        // For text, apply scale to scaleX and scaleY properties
+        updatedElement.scaleX = (selectedElement.scaleX || 1) * scaleX;
+        updatedElement.scaleY = (selectedElement.scaleY || 1) * scaleY;
+        
+        // Reset the node's scale
+        node.scaleX(1);
+        node.scaleY(1);
       }
       
-      console.log('TransformTool: updating element to:', updatedElement);
+      console.log('LassoTool: updating element to:', updatedElement);
       updateElement(updatedElement);
       
       // Save to history after transformation

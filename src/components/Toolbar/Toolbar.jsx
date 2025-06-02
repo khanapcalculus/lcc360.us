@@ -12,7 +12,7 @@ const customIcons = {
   rectangle: '/icons/rectangle.png',
   circle: '/icons/circle.png',
   line: '/icons/line.png',
-  transform: '/icons/transform.png',
+  transform: '/icons/lasso.png',
   text: '/icons/text.png',
   pan: '/icons/pan.png',
   image: '/icons/image.png',
@@ -26,7 +26,7 @@ const fallbackIcons = {
   rectangle: 'fas fa-square',
   circle: 'fas fa-circle',
   line: 'fas fa-slash',
-  transform: 'fas fa-arrows-alt',
+  transform: 'fas fa-object-group',
   text: 'fas fa-font',
   pan: 'fas fa-hand-paper',
   image: 'fas fa-image',
@@ -148,7 +148,7 @@ const Toolbar = () => {
         <button 
           className={`tool-button ${tool === 'transform' ? 'active' : ''}`}
           onClick={() => setTool('transform')}
-          title="Transform"
+          title="Lasso Select"
         >
           <ToolIcon tool="transform" />
         </button>

@@ -9,7 +9,7 @@ import PanTool from '../../tools/PanTool';
 import PenTool from '../../tools/PenTool';
 import RectangleTool from '../../tools/RectangleTool';
 import TextTool from '../../tools/TextTool';
-import TransformTool from '../../tools/TransformTool';
+import LassoTool from '../../tools/TransformTool';
 
 const Canvas = () => {
   const context = useContext(WhiteboardContext);
@@ -68,7 +68,7 @@ const Canvas = () => {
         rectangle: new RectangleTool(context),
         circle: new CircleTool(context),
         line: new LineTool(context),
-        transform: new TransformTool(context),
+        transform: new LassoTool(context),
         pan: new PanTool(context),
         image: new ImageTool(context),
         text: new TextTool(context)
@@ -530,6 +530,7 @@ const Canvas = () => {
             lineCap={element.lineCap}
             lineJoin={element.lineJoin}
             tension={element.tension}
+            dash={element.dash}
             globalCompositeOperation={element.globalCompositeOperation}
             rotation={element.rotation || 0}
             onClick={() => handleElementClick(element)}
