@@ -216,6 +216,38 @@ export const WhiteboardProvider = ({ children }) => {
     };
   }, []);
 
+  const deleteElement = (elementId) => {
+    setPages(prevPages => {
+      const updatedPages = { ...prevPages };
+      updatedPages[currentPage] = updatedPages[currentPage].filter(el => el.id !== elementId);
+      
+      // Add to history
+      const newHistory = [...history.slice(0, historyIndex + 1), {
+        pages: updatedPages,
+        currentPage
+      }];
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+      
+      // Emit to socket
+      socket.current.emit('element-update', {
+        type: 'delete',
+        page: currentPage,
+        elementId,
+        userId: userId.current
+      });
+      
+      return updatedPages;
+    });
+  };
+
+  const deleteSelectedElement = () => {
+    if (selectedElement) {
+      deleteElement(selectedElement.id);
+      setSelectedElement(null);
+    }
+  };
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -335,31 +367,6 @@ export const WhiteboardProvider = ({ children }) => {
     console.log('WhiteboardContext: Saved to history, index:', newHistory.length - 1);
   };
 
-  const deleteElement = (elementId) => {
-    setPages(prevPages => {
-      const updatedPages = { ...prevPages };
-      updatedPages[currentPage] = updatedPages[currentPage].filter(el => el.id !== elementId);
-      
-      // Add to history
-      const newHistory = [...history.slice(0, historyIndex + 1), {
-        pages: updatedPages,
-        currentPage
-      }];
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
-      
-      // Emit to socket
-      socket.current.emit('element-update', {
-        type: 'delete',
-        page: currentPage,
-        elementId,
-        userId: userId.current
-      });
-      
-      return updatedPages;
-    });
-  };
-
   const clearPage = () => {
     setPages(prevPages => {
       const updatedPages = { ...prevPages };
@@ -382,13 +389,6 @@ export const WhiteboardProvider = ({ children }) => {
       
       return updatedPages;
     });
-  };
-
-  const deleteSelectedElement = () => {
-    if (selectedElement) {
-      deleteElement(selectedElement.id);
-      setSelectedElement(null);
-    }
   };
 
   const deletePage = (pageNumber) => {
