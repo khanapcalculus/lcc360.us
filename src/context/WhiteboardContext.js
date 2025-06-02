@@ -14,7 +14,7 @@ export const WhiteboardProvider = ({ children }) => {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedElement, setSelectedElement] = useState(null);
-  const [selectedElements, setSelectedElements] = useState([]);
+  const [selectedElementsInternal, setSelectedElementsInternal] = useState([]);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   
@@ -243,18 +243,18 @@ export const WhiteboardProvider = ({ children }) => {
   };
 
   const deleteSelectedElement = () => {
-    if (selectedElements.length > 1) {
-      console.log('WhiteboardContext: Deleting multiple selected elements:', selectedElements.length);
+    if (selectedElementsInternal.length > 1) {
+      console.log('WhiteboardContext: Deleting multiple selected elements:', selectedElementsInternal.length);
       
-      const count = selectedElements.length;
+      const count = selectedElementsInternal.length;
       
       // Delete all selected elements
-      selectedElements.forEach(element => {
+      selectedElementsInternal.forEach(element => {
         deleteElement(element.id);
       });
       
       // Clear the selections
-      setSelectedElements([]);
+      setSelectedElementsInternal([]);
       setSelectedElement(null);
       
       // Show notification
@@ -283,14 +283,14 @@ export const WhiteboardProvider = ({ children }) => {
       // Single element deletion
       deleteElement(selectedElement.id);
       setSelectedElement(null);
-      setSelectedElements([]);
+      setSelectedElementsInternal([]);
     }
   };
 
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Delete' && selectedElement) {
+      if (e.key === 'Delete' && (selectedElement || selectedElementsInternal.length > 0)) {
         deleteSelectedElement();
       }
     };
@@ -300,7 +300,7 @@ export const WhiteboardProvider = ({ children }) => {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedElement, deleteSelectedElement]);
+  }, [selectedElement, selectedElementsInternal, deleteSelectedElement]);
 
   const addElement = (element) => {
     console.log('WhiteboardContext: addElement called with:', element);
@@ -563,6 +563,18 @@ export const WhiteboardProvider = ({ children }) => {
     }
   };
 
+  // Wrapper for setSelectedElements with debugging
+  const setSelectedElements = (elements) => {
+    console.log('🔧 WhiteboardContext: setSelectedElements called with:', elements);
+    console.log('🔧 WhiteboardContext: elements count:', elements?.length || 0);
+    setSelectedElementsInternal(elements);
+    
+    // Log the state after a short delay to see if it was set correctly
+    setTimeout(() => {
+      console.log('🔧 WhiteboardContext: selectedElements state after update:', selectedElementsInternal);
+    }, 100);
+  };
+
   return (
     <WhiteboardContext.Provider
       value={{
@@ -587,7 +599,7 @@ export const WhiteboardProvider = ({ children }) => {
         setIsDrawing,
         selectedElement,
         setSelectedElement,
-        selectedElements,
+        selectedElements: selectedElementsInternal,
         setSelectedElements,
         scale,
         setScale,

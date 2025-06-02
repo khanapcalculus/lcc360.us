@@ -12,7 +12,7 @@ const customIcons = {
   rectangle: '/icons/rectangle.png',
   circle: '/icons/circle.png',
   line: '/icons/line.png',
-  transform: '/icons/lasso.png',
+  transform: '/icons/transform.png',
   text: '/icons/text.png',
   pan: '/icons/pan.png',
   image: '/icons/image.png',
