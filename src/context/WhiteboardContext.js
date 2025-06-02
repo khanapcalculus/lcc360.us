@@ -82,51 +82,6 @@ export const WhiteboardProvider = ({ children }) => {
     }
   }, [history, historyIndex]);
 
-  // Initialize socket connection
-  useEffect(() => {
-    console.log('WhiteboardContext: Initializing socket connection...');
-    
-    socket.current = io('https://lcc360-us.onrender.com', {
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
-      forceNew: true
-    });
-    
-    socket.current.on('connect', () => {
-      console.log('WhiteboardContext: Connected to server');
-      userId.current = socket.current.id;
-    });
-    
-    socket.current.on('disconnect', () => {
-      console.log('WhiteboardContext: Disconnected from server');
-    });
-    
-    socket.current.on('element-update', handleSocketMessage);
-    socket.current.on('page-change', handlePageChange);
-    
-    return () => {
-      console.log('WhiteboardContext: Cleaning up socket connection...');
-      if (socket.current) {
-        socket.current.disconnect();
-      }
-    };
-  }, []);
-
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Delete' && selectedElement) {
-        deleteSelectedElement();
-      }
-    };
-    
-    document.addEventListener('keydown', handleKeyDown);
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [selectedElement, deleteSelectedElement]);
-
   const updateElementsFromSocket = (data) => {
     console.log('WhiteboardContext: updateElementsFromSocket called with:', data);
     
@@ -202,6 +157,79 @@ export const WhiteboardProvider = ({ children }) => {
       });
     }
   };
+
+  const handleSocketMessage = (data) => {
+    console.log('WhiteboardContext: Received element-update:', data);
+    if (data.userId !== userId.current) {
+      console.log('WhiteboardContext: Processing element update from another user');
+      updateElementsFromSocket(data);
+    } else {
+      console.log('WhiteboardContext: Ignoring own element update');
+    }
+  };
+
+  const handlePageChange = (data) => {
+    console.log('WhiteboardContext: Received page-change:', data);
+    if (data.userId !== userId.current) {
+      console.log('WhiteboardContext: Processing page change from another user');
+      // Only update the pages data, don't force current user to change pages
+      setPages(prevPages => {
+        const updatedPages = { ...prevPages };
+        // Merge the received pages with existing pages
+        Object.keys(data.pages).forEach(pageNum => {
+          updatedPages[pageNum] = data.pages[pageNum];
+        });
+        return updatedPages;
+      });
+    } else {
+      console.log('WhiteboardContext: Ignoring own page change');
+    }
+  };
+
+  // Initialize socket connection
+  useEffect(() => {
+    console.log('WhiteboardContext: Initializing socket connection...');
+    
+    socket.current = io('https://lcc360-us.onrender.com', {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true
+    });
+    
+    socket.current.on('connect', () => {
+      console.log('WhiteboardContext: Connected to server');
+      userId.current = socket.current.id;
+    });
+    
+    socket.current.on('disconnect', () => {
+      console.log('WhiteboardContext: Disconnected from server');
+    });
+    
+    socket.current.on('element-update', handleSocketMessage);
+    socket.current.on('page-change', handlePageChange);
+    
+    return () => {
+      console.log('WhiteboardContext: Cleaning up socket connection...');
+      if (socket.current) {
+        socket.current.disconnect();
+      }
+    };
+  }, []);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Delete' && selectedElement) {
+        deleteSelectedElement();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedElement, deleteSelectedElement]);
 
   const addElement = (element) => {
     console.log('WhiteboardContext: addElement called with:', element);
