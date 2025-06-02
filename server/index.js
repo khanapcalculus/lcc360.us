@@ -35,17 +35,30 @@ if (process.env.NODE_ENV === 'production') {
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: corsOptions
+  cors: corsOptions,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
+  allowUpgrades: true,
+  transports: ['websocket', 'polling'],
+  allowEIO3: true
 });
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
+  
+  // Send connection confirmation
+  socket.emit('connection-confirmed', { 
+    socketId: socket.id, 
+    timestamp: Date.now() 
+  });
   
   socket.on('element-update', (data) => {
     console.log('Received element-update:', data.type, data.userId);
     if (data.type === 'test') {
       console.log('🧪 Test message received:', data.message);
     }
+    // Broadcast immediately without delay
     socket.broadcast.emit('element-update', data);
   });
   
@@ -58,8 +71,12 @@ io.on('connection', (socket) => {
     socket.emit('pong');
   });
   
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+  socket.on('error', (error) => {
+    console.error('Socket error for user', socket.id, ':', error);
+  });
+  
+  socket.on('disconnect', (reason) => {
+    console.log('User disconnected:', socket.id, 'Reason:', reason);
   });
 });
 

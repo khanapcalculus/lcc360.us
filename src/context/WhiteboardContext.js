@@ -20,6 +20,8 @@ export const WhiteboardProvider = ({ children }) => {
   
   const socket = useRef(null);
   const userId = useRef(uuidv4());
+  const updateThrottle = useRef(null);
+  const isDebug = process.env.NODE_ENV === 'development';
 
   // Load saved data on component mount
   useEffect(() => {
@@ -160,12 +162,20 @@ export const WhiteboardProvider = ({ children }) => {
   };
 
   const handleSocketMessage = (data) => {
-    console.log('WhiteboardContext: Received element-update:', data);
+    const receiveTime = Date.now();
+    if (isDebug) console.log('WhiteboardContext: Received element-update:', data);
+    
+    // Log latency for test messages
+    if (data.type === 'test' && data.element && data.element.timestamp) {
+      const latency = receiveTime - data.element.timestamp;
+      console.log('🧪 Real-time sync latency:', latency, 'ms');
+    }
+    
     if (data.userId !== userId.current) {
-      console.log('WhiteboardContext: Processing element update from another user');
+      if (isDebug) console.log('WhiteboardContext: Processing element update from another user');
       updateElementsFromSocket(data);
     } else {
-      console.log('WhiteboardContext: Ignoring own element update');
+      if (isDebug) console.log('WhiteboardContext: Ignoring own element update');
     }
   };
 
@@ -189,21 +199,44 @@ export const WhiteboardProvider = ({ children }) => {
 
   // Initialize socket connection
   useEffect(() => {
-    console.log('WhiteboardContext: Initializing socket connection...');
+    if (isDebug) console.log('WhiteboardContext: Initializing socket connection...');
     
     socket.current = io('https://lcc360-us.onrender.com', {
       transports: ['websocket', 'polling'],
       timeout: 20000,
-      forceNew: true
+      forceNew: false,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      maxReconnectionAttempts: 10,
+      randomizationFactor: 0.5,
+      upgrade: true,
+      rememberUpgrade: true
     });
     
     socket.current.on('connect', () => {
-      console.log('WhiteboardContext: Connected to server');
+      if (isDebug) console.log('WhiteboardContext: Connected to server');
       userId.current = socket.current.id;
     });
     
+    socket.current.on('connection-confirmed', (data) => {
+      if (isDebug) console.log('WhiteboardContext: Connection confirmed:', data);
+    });
+    
+    socket.current.on('connect_error', (error) => {
+      console.error('WhiteboardContext: Connection error:', error);
+    });
+    
+    socket.current.on('reconnect', (attemptNumber) => {
+      if (isDebug) console.log('WhiteboardContext: Reconnected after', attemptNumber, 'attempts');
+    });
+    
+    socket.current.on('reconnect_error', (error) => {
+      console.error('WhiteboardContext: Reconnection error:', error);
+    });
+    
     socket.current.on('disconnect', () => {
-      console.log('WhiteboardContext: Disconnected from server');
+      if (isDebug) console.log('WhiteboardContext: Disconnected from server');
     });
     
     socket.current.on('element-update', handleSocketMessage);
@@ -364,32 +397,39 @@ export const WhiteboardProvider = ({ children }) => {
   };
 
   const updateElement = (updatedElement) => {
-    console.log('WhiteboardContext: updateElement called with:', updatedElement);
+    if (isDebug) console.log('WhiteboardContext: updateElement called with:', updatedElement);
     setPages(prevPages => {
       const updatedPages = { ...prevPages };
       const oldElement = updatedPages[currentPage].find(el => el.id === updatedElement.id);
-      console.log('WhiteboardContext: updating element from:', oldElement, 'to:', updatedElement);
+      if (isDebug) console.log('WhiteboardContext: updating element from:', oldElement, 'to:', updatedElement);
       
       updatedPages[currentPage] = updatedPages[currentPage].map(el => 
         el.id === updatedElement.id ? updatedElement : el
       );
       
-      console.log('WhiteboardContext: updated pages:', updatedPages);
+      if (isDebug) console.log('WhiteboardContext: updated pages:', updatedPages);
       
       // Don't add to history during drawing - only when drawing is complete
       
-      // Emit to socket
-      if (socket.current && socket.current.connected) {
-        console.log('WhiteboardContext: Emitting element update to socket:', updatedElement.id);
-        socket.current.emit('element-update', {
-          type: 'update',
-          page: currentPage,
-          element: updatedElement,
-          userId: userId.current
-        });
-      } else {
-        console.error('WhiteboardContext: Socket not connected for element update');
+      // Throttle socket emissions to improve performance
+      if (updateThrottle.current) {
+        clearTimeout(updateThrottle.current);
       }
+      
+      updateThrottle.current = setTimeout(() => {
+        // Emit to socket
+        if (socket.current && socket.current.connected) {
+          if (isDebug) console.log('WhiteboardContext: Emitting element update to socket:', updatedElement.id);
+          socket.current.emit('element-update', {
+            type: 'update',
+            page: currentPage,
+            element: updatedElement,
+            userId: userId.current
+          });
+        } else {
+          console.error('WhiteboardContext: Socket not connected for element update');
+        }
+      }, 16); // ~60fps throttling
       
       return updatedPages;
     });
@@ -563,6 +603,28 @@ export const WhiteboardProvider = ({ children }) => {
     }
   };
 
+  // Performance test function
+  const testRealTimeSync = () => {
+    const testElement = {
+      type: 'test',
+      timestamp: Date.now(),
+      message: `Performance test from ${userId.current}`
+    };
+    
+    console.log('🧪 Sending performance test:', testElement);
+    
+    if (socket.current && socket.current.connected) {
+      socket.current.emit('element-update', {
+        type: 'test',
+        element: testElement,
+        userId: userId.current,
+        page: currentPage
+      });
+    } else {
+      console.error('Socket not connected for performance test');
+    }
+  };
+
   // Wrapper for setSelectedElements with debugging
   const setSelectedElements = (elements) => {
     console.log('🔧 WhiteboardContext: setSelectedElements called with:', elements);
@@ -609,7 +671,8 @@ export const WhiteboardProvider = ({ children }) => {
         canRedo: historyIndex < history.length - 1,
         clearStorage,
         deleteSelectedElement,
-        deletePage
+        deletePage,
+        testRealTimeSync
       }}
     >
       {children}
