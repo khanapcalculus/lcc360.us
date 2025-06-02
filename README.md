@@ -16,8 +16,8 @@ A real-time collaborative whiteboard application built with React, Konva, and So
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/khanapcalculus/lccpi.git
-cd lccpi
+git clone https://github.com/khanapcalculus/lcc360.us.git
+cd lcc360.us
 ```
 
 2. Install dependencies:

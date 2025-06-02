@@ -14,7 +14,7 @@ services:
     healthCheckPath: /
     autoDeploy: true
     # GitHub repository configuration
-    repo: https://github.com/khanapcalculus/lccpi
+    repo: https://github.com/khanapcalculus/lcc360.us
     branch: main
     buildCommand: npm install && npm run build
     startCommand: node server/index.js

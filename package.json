@@ -2,6 +2,10 @@
   "name": "rtc-whiteboard",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/khanapcalculus/lcc360.us.git"
+  },
   "dependencies": {
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
