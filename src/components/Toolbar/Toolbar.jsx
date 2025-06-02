@@ -16,7 +16,8 @@ const customIcons = {
   text: '/icons/text.png',
   pan: '/icons/pan.png',
   image: '/icons/image.png',
-  trash: '/icons/trash.png'
+  trash: '/icons/trash.png',
+  clear: '/icons/clear.png'
 };
 
 // Fallback FontAwesome icons
@@ -30,7 +31,8 @@ const fallbackIcons = {
   text: 'fas fa-font',
   pan: 'fas fa-hand-paper',
   image: 'fas fa-image',
-  trash: 'fas fa-trash'
+  trash: 'fas fa-trash',
+  clear: 'fas fa-broom'
 };
 
 const ToolIcon = ({ tool, className }) => {
@@ -207,6 +209,14 @@ const Toolbar = () => {
           title="Redo"
         >
           <i className="fas fa-redo"></i>
+        </button>
+        
+        <button 
+          className="tool-button"
+          onClick={clearPage}
+          title="Clear Page"
+        >
+          <ToolIcon tool="clear" />
         </button>
         
         <button 
