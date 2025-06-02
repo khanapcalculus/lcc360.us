@@ -66,14 +66,14 @@
   width: 20px;
   height: 20px;
   object-fit: contain;
-  filter: brightness(0) saturate(100%) invert(20%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(0%) contrast(100%);
-  transition: filter 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .tool-button.active .tool-icon {
-  filter: brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(204deg) brightness(97%) contrast(97%);
+  transform: scale(1.1);
+  opacity: 0.8;
 }
 
 .tool-button:hover .tool-icon {
-  filter: brightness(0) saturate(100%) invert(10%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(0%) contrast(100%);
+  transform: scale(1.05);
 }
