@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef } from 'react';
-import { Circle, Image, Layer, Line, Rect, Stage, Transformer } from 'react-konva';
+import { Circle, Image, Layer, Line, Rect, Stage, Text, Transformer } from 'react-konva';
 import { WhiteboardContext } from '../../context/WhiteboardContext';
 import CircleTool from '../../tools/CircleTool';
 import EraserTool from '../../tools/EraserTool';
@@ -8,6 +8,7 @@ import LineTool from '../../tools/LineTool';
 import PanTool from '../../tools/PanTool';
 import PenTool from '../../tools/PenTool';
 import RectangleTool from '../../tools/RectangleTool';
+import TextTool from '../../tools/TextTool';
 import TransformTool from '../../tools/TransformTool';
 
 const Canvas = () => {
@@ -35,7 +36,8 @@ const Canvas = () => {
     line: null,
     transform: null,
     pan: null,
-    image: null
+    image: null,
+    text: null
   });
   
   // Test direct event listeners
@@ -68,7 +70,8 @@ const Canvas = () => {
         line: new LineTool(context),
         transform: new TransformTool(context),
         pan: new PanTool(context),
-        image: new ImageTool(context)
+        image: new ImageTool(context),
+        text: new TextTool(context)
       };
       console.log('Tool instances created:', Object.keys(toolInstances.current));
     } else if (toolInstances.current.pen) {
@@ -303,6 +306,37 @@ const Canvas = () => {
             }}
           />
         );
+      case 'text':
+        return (
+          <Text
+            key={element.id}
+            id={element.id}
+            x={element.x}
+            y={element.y}
+            text={element.text}
+            fontSize={element.fontSize}
+            fontFamily={element.fontFamily}
+            fill={element.fill}
+            align={element.align}
+            verticalAlign={element.verticalAlign}
+            rotation={element.rotation || 0}
+            onClick={() => handleElementClick(element)}
+            draggable={tool === 'transform' && selectedElement?.id === element.id}
+            onDragEnd={(e) => {
+              if (tool === 'transform') {
+                const updatedElement = {
+                  ...element,
+                  x: e.target.x(),
+                  y: e.target.y()
+                };
+                updateElement(updatedElement);
+                if (context.saveToHistory) {
+                  context.saveToHistory();
+                }
+              }
+            }}
+          />
+        );
       default:
         return null;
     }
@@ -332,7 +366,7 @@ const Canvas = () => {
         y={position.y}
         listening={true}
         preventDefault={false}
-        style={{ backgroundColor: 'rgba(0, 255, 0, 0.1)' }}
+        style={{ backgroundColor: '#ffffff' }}
       >
         <Layer 
           ref={layerRef}

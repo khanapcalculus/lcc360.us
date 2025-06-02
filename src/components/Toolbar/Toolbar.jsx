@@ -5,6 +5,55 @@ import ColorPalette from '../ColorPalette/ColorPalette.jsx';
 import StrokePalette from '../StrokePalette/StrokePalette.jsx';
 import './Toolbar.css';
 
+// Custom icon mapping - you can replace these paths with your custom icons
+const customIcons = {
+  pen: '/icons/pen.png',
+  eraser: '/icons/eraser.png',
+  rectangle: '/icons/rectangle.png',
+  circle: '/icons/circle.png',
+  line: '/icons/line.png',
+  transform: '/icons/transform.png',
+  text: '/icons/text.png',
+  pan: '/icons/pan.png',
+  image: '/icons/image.png',
+  trash: '/icons/trash.png'
+};
+
+// Fallback FontAwesome icons
+const fallbackIcons = {
+  pen: 'fas fa-pen',
+  eraser: 'fas fa-eraser',
+  rectangle: 'fas fa-square',
+  circle: 'fas fa-circle',
+  line: 'fas fa-slash',
+  transform: 'fas fa-arrows-alt',
+  text: 'fas fa-font',
+  pan: 'fas fa-hand-paper',
+  image: 'fas fa-image',
+  trash: 'fas fa-trash'
+};
+
+const ToolIcon = ({ tool, className }) => {
+  const [useCustom, setUseCustom] = React.useState(true);
+  
+  const handleImageError = () => {
+    setUseCustom(false);
+  };
+  
+  if (useCustom && customIcons[tool]) {
+    return (
+      <img 
+        src={customIcons[tool]} 
+        alt={tool}
+        className="tool-icon"
+        onError={handleImageError}
+      />
+    );
+  }
+  
+  return <i className={fallbackIcons[tool]}></i>;
+};
+
 const Toolbar = () => {
   const context = useContext(WhiteboardContext);
   const { 
@@ -53,7 +102,7 @@ const Toolbar = () => {
           }}
           title="Pen"
         >
-          <i className="fas fa-pen"></i>
+          <ToolIcon tool="pen" />
         </button>
         
         <button 
@@ -64,7 +113,7 @@ const Toolbar = () => {
           }}
           title="Eraser"
         >
-          <i className="fas fa-eraser"></i>
+          <ToolIcon tool="eraser" />
         </button>
         
         <button 
@@ -75,7 +124,7 @@ const Toolbar = () => {
           }}
           title="Rectangle"
         >
-          <i className="fas fa-square"></i>
+          <ToolIcon tool="rectangle" />
         </button>
         
         <button 
@@ -83,7 +132,7 @@ const Toolbar = () => {
           onClick={() => setTool('circle')}
           title="Circle"
         >
-          <i className="fas fa-circle"></i>
+          <ToolIcon tool="circle" />
         </button>
         
         <button 
@@ -91,7 +140,7 @@ const Toolbar = () => {
           onClick={() => setTool('line')}
           title="Line"
         >
-          <i className="fas fa-slash"></i>
+          <ToolIcon tool="line" />
         </button>
         
         <button 
@@ -99,7 +148,15 @@ const Toolbar = () => {
           onClick={() => setTool('transform')}
           title="Transform"
         >
-          <i className="fas fa-arrows-alt"></i>
+          <ToolIcon tool="transform" />
+        </button>
+        
+        <button 
+          className={`tool-button ${tool === 'text' ? 'active' : ''}`}
+          onClick={() => setTool('text')}
+          title="Text"
+        >
+          <ToolIcon tool="text" />
         </button>
         
         <button 
@@ -107,7 +164,7 @@ const Toolbar = () => {
           onClick={() => setTool('pan')}
           title="Pan"
         >
-          <i className="fas fa-hand-paper"></i>
+          <ToolIcon tool="pan" />
         </button>
         
         <button 
@@ -115,7 +172,7 @@ const Toolbar = () => {
           onClick={handleImageUpload}
           title="Upload Image"
         >
-          <i className="fas fa-image"></i>
+          <ToolIcon tool="image" />
         </button>
         <input 
           type="file" 
@@ -155,7 +212,7 @@ const Toolbar = () => {
           onClick={clearPage}
           title="Clear Page"
         >
-          <i className="fas fa-trash"></i>
+          <ToolIcon tool="trash" />
         </button>
       </div>
     </div>

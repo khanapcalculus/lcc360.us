@@ -1,24 +1,32 @@
 .stroke-palette-container {
   position: relative;
-  margin: 10px 0;
+  margin: 2px 0;
 }
 
 .stroke-button {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 2px solid #ddd;
-  background-color: #fff;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  background-color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.stroke-button:hover {
+  background-color: rgba(255, 255, 255, 1);
+  border-color: rgba(0, 0, 0, 0.3);
+  transform: scale(1.05);
 }
 
 .stroke-indicator {
-  width: 25px;
-  background-color: #000;
+  width: 20px;
+  background-color: #333;
   border-radius: 10px;
 }
 
@@ -30,11 +38,13 @@
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, 1fr);
   gap: 5px;
-  background-color: #fff;
+  background-color: rgba(255, 255, 255, 0.95);
   padding: 10px;
-  border-radius: 5px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
   z-index: 100;
+  backdrop-filter: blur(10px);
 }
 
 .stroke-option {
@@ -44,17 +54,17 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border: 1px solid #ddd;
-  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
   transition: background-color 0.2s;
 }
 
 .stroke-option:hover {
-  background-color: #f0f0f0;
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .stroke-preview {
-  width: 25px;
-  background-color: #000;
+  width: 20px;
+  background-color: #333;
   border-radius: 10px;
 }
