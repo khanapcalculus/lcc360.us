@@ -4,6 +4,7 @@ export default class LassoTool {
     this.isDrawing = false;
     this.lassoPoints = [];
     this.lassoLine = null;
+    this.lassoFill = null;
   }
 
   // Helper function to get transformed mouse position accounting for pan and zoom
@@ -142,11 +143,12 @@ export default class LassoTool {
       
       // Clear previous selection when starting new lasso
       setSelectedElement(null);
+      this.context.setSelectedElements([]);
 
-      // Create temporary lasso line for visual feedback
+      // Create temporary lasso line for visual feedback (dashed border)
       const newLassoLine = {
         type: 'line',
-        id: 'temp-lasso-' + Date.now(),
+        id: 'temp-lasso-line-' + Date.now(),
         points: this.lassoPoints,
         stroke: '#007bff',
         strokeWidth: 2,
@@ -157,9 +159,22 @@ export default class LassoTool {
         globalCompositeOperation: 'source-over'
       };
 
-      console.log('LassoTool: Creating temporary lasso line:', newLassoLine);
-      const addedElement = this.context.addElement(newLassoLine);
-      this.lassoLine = addedElement || newLassoLine;
+      // Create temporary filled polygon for selection area
+      const newLassoFill = {
+        type: 'polygon',
+        id: 'temp-lasso-fill-' + Date.now(),
+        points: this.lassoPoints,
+        fill: 'rgba(0, 255, 0, 0.2)', // Light green with transparency
+        stroke: 'transparent',
+        strokeWidth: 0,
+        globalCompositeOperation: 'source-over'
+      };
+
+      console.log('LassoTool: Creating temporary lasso elements');
+      const addedLine = this.context.addElement(newLassoLine);
+      const addedFill = this.context.addElement(newLassoFill);
+      this.lassoLine = addedLine || newLassoLine;
+      this.lassoFill = addedFill || newLassoFill;
     }
   }
 
@@ -173,7 +188,7 @@ export default class LassoTool {
     this.lassoPoints = [...this.lassoPoints, point.x, point.y];
     console.log('LassoTool: Adding point to lasso:', point, 'Total points:', this.lassoPoints.length / 2);
 
-    // Update the temporary lasso line
+    // Update the temporary lasso line (dashed border)
     if (this.lassoLine) {
       const updatedLassoLine = {
         ...this.lassoLine,
@@ -181,6 +196,16 @@ export default class LassoTool {
       };
       console.log('LassoTool: Updating lasso line with points:', this.lassoPoints);
       this.context.updateElement(updatedLassoLine);
+    }
+
+    // Update the temporary filled polygon
+    if (this.lassoFill) {
+      const updatedLassoFill = {
+        ...this.lassoFill,
+        points: this.lassoPoints
+      };
+      console.log('LassoTool: Updating lasso fill with points:', this.lassoPoints);
+      this.context.updateElement(updatedLassoFill);
     }
   }
 
@@ -190,11 +215,16 @@ export default class LassoTool {
     console.log('LassoTool onMouseUp - completing lasso selection');
     this.isDrawing = false;
 
-    // Remove the temporary lasso line
+    // Remove the temporary lasso elements
     if (this.lassoLine) {
       console.log('LassoTool: Removing temporary lasso line:', this.lassoLine.id);
       this.context.deleteElement(this.lassoLine.id);
       this.lassoLine = null;
+    }
+    if (this.lassoFill) {
+      console.log('LassoTool: Removing temporary lasso fill:', this.lassoFill.id);
+      this.context.deleteElement(this.lassoFill.id);
+      this.lassoFill = null;
     }
 
     // Close the lasso by connecting to the first point
@@ -203,13 +233,13 @@ export default class LassoTool {
       console.log('LassoTool: Closed lasso with points:', this.lassoPoints);
 
       // Find all elements inside the lasso
-      const { pages, currentPage, setSelectedElement } = this.context;
+      const { pages, currentPage, setSelectedElement, setSelectedElements } = this.context;
       const currentPageElements = pages[currentPage] || [];
       console.log('LassoTool: Checking', currentPageElements.length, 'elements for selection');
       
       const selectedElements = currentPageElements.filter(element => {
-        // Skip temporary lasso lines
-        if (element.id && element.id.startsWith('temp-lasso-')) {
+        // Skip temporary lasso lines and fills
+        if (element.id && (element.id.startsWith('temp-lasso-'))) {
           return false;
         }
         const isInside = this.isElementInLasso(element, this.lassoPoints);
@@ -223,15 +253,18 @@ export default class LassoTool {
         // If only one element is selected, select it for transformation
         console.log('LassoTool: Selecting single element:', selectedElements[0]);
         setSelectedElement(selectedElements[0]);
+        setSelectedElements([selectedElements[0]]);
       } else if (selectedElements.length > 1) {
-        // For multiple elements, we'll select the first one for now
-        console.log('LassoTool: Multiple elements selected, selecting first one:', selectedElements[0]);
-        setSelectedElement(selectedElements[0]);
+        // For multiple elements, select the first one but store all
+        console.log('LassoTool: Multiple elements selected:', selectedElements.length);
+        setSelectedElement(selectedElements[0]); // Select first for transformation
+        setSelectedElements(selectedElements); // Store all for deletion
         
         // Show a notification about multiple selection
         this.showMultiSelectionNotification(selectedElements.length);
       } else {
         console.log('LassoTool: No elements found in lasso selection');
+        setSelectedElements([]);
       }
     } else {
       console.log('LassoTool: Not enough points for lasso selection:', this.lassoPoints.length);
@@ -244,12 +277,12 @@ export default class LassoTool {
   showMultiSelectionNotification(count) {
     // Show visual feedback for multiple selection
     const notification = document.createElement('div');
-    notification.textContent = `${count} objects selected. Use Delete key or trash button to delete all.`;
+    notification.textContent = `🎯 ${count} objects selected! First object is active for transformation. Use Delete key or trash button to delete all selected objects.`;
     notification.style.position = 'fixed';
     notification.style.top = '20px';
     notification.style.left = '50%';
     notification.style.transform = 'translateX(-50%)';
-    notification.style.backgroundColor = 'rgba(59, 130, 246, 0.9)';
+    notification.style.backgroundColor = 'rgba(34, 197, 94, 0.9)'; // Green background
     notification.style.color = 'white';
     notification.style.padding = '12px 20px';
     notification.style.borderRadius = '8px';
@@ -258,15 +291,17 @@ export default class LassoTool {
     notification.style.fontFamily = 'Arial, sans-serif';
     notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
     notification.style.animation = 'slideIn 0.3s ease-out';
+    notification.style.maxWidth = '80vw';
+    notification.style.textAlign = 'center';
     
     document.body.appendChild(notification);
     
-    // Remove notification after 3 seconds
+    // Remove notification after 4 seconds (longer for more text)
     setTimeout(() => {
       if (document.body.contains(notification)) {
         document.body.removeChild(notification);
       }
-    }, 3000);
+    }, 4000);
   }
 
   onTransformEnd(e) {

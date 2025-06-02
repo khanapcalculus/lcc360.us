@@ -14,6 +14,7 @@ export const WhiteboardProvider = ({ children }) => {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedElement, setSelectedElement] = useState(null);
+  const [selectedElements, setSelectedElements] = useState([]);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   
@@ -242,9 +243,47 @@ export const WhiteboardProvider = ({ children }) => {
   };
 
   const deleteSelectedElement = () => {
-    if (selectedElement) {
+    if (selectedElements.length > 1) {
+      console.log('WhiteboardContext: Deleting multiple selected elements:', selectedElements.length);
+      
+      const count = selectedElements.length;
+      
+      // Delete all selected elements
+      selectedElements.forEach(element => {
+        deleteElement(element.id);
+      });
+      
+      // Clear the selections
+      setSelectedElements([]);
+      setSelectedElement(null);
+      
+      // Show notification
+      const notification = document.createElement('div');
+      notification.textContent = `🗑️ Deleted ${count} objects`;
+      notification.style.position = 'fixed';
+      notification.style.top = '20px';
+      notification.style.right = '20px';
+      notification.style.backgroundColor = 'rgba(239, 68, 68, 0.9)';
+      notification.style.color = 'white';
+      notification.style.padding = '12px 20px';
+      notification.style.borderRadius = '8px';
+      notification.style.zIndex = '10000';
+      notification.style.fontSize = '14px';
+      notification.style.fontFamily = 'Arial, sans-serif';
+      notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification);
+        }
+      }, 3000);
+    } else if (selectedElement) {
+      // Single element deletion
       deleteElement(selectedElement.id);
       setSelectedElement(null);
+      setSelectedElements([]);
     }
   };
 
@@ -548,6 +587,8 @@ export const WhiteboardProvider = ({ children }) => {
         setIsDrawing,
         selectedElement,
         setSelectedElement,
+        selectedElements,
+        setSelectedElements,
         scale,
         setScale,
         position,

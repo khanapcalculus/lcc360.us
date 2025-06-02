@@ -516,7 +516,8 @@ const Canvas = () => {
     console.log('Canvas: rendering element:', element.type, 'with dimensions:', 
                element.type === 'rectangle' ? `${element.width}x${element.height}` :
                element.type === 'circle' ? `radius: ${element.radius}` :
-               element.type === 'line' ? `points: ${element.points}` : 'unknown');
+               element.type === 'line' ? `points: ${element.points}` : 
+               element.type === 'polygon' ? `polygon with ${element.points?.length / 2} points` : 'unknown');
     
     switch (element.type) {
       case 'line':
@@ -690,6 +691,23 @@ const Canvas = () => {
                 }
               }
             }}
+          />
+        );
+      case 'polygon':
+        console.log('Canvas: rendering polygon element:', element.id, 'with fill:', element.fill);
+        return (
+          <Line
+            key={element.id}
+            id={element.id}
+            points={element.points}
+            fill={element.fill}
+            stroke={element.stroke}
+            strokeWidth={element.strokeWidth}
+            closed={true}
+            globalCompositeOperation={element.globalCompositeOperation}
+            rotation={element.rotation || 0}
+            onClick={() => handleElementClick(element)}
+            listening={!element.id?.startsWith('temp-lasso-')}
           />
         );
       default:
