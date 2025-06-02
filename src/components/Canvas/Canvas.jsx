@@ -520,6 +520,7 @@ const Canvas = () => {
     
     switch (element.type) {
       case 'line':
+        console.log('Canvas: rendering line element:', element.id, 'with dash:', element.dash);
         return (
           <Line
             key={element.id}
@@ -534,6 +535,7 @@ const Canvas = () => {
             globalCompositeOperation={element.globalCompositeOperation}
             rotation={element.rotation || 0}
             onClick={() => handleElementClick(element)}
+            listening={!element.id?.startsWith('temp-lasso-')}
           />
         );
       case 'rectangle':

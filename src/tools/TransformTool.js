@@ -43,54 +43,63 @@ export default class LassoTool {
   isElementInLasso(element, lassoPoints) {
     if (lassoPoints.length < 6) return false; // Need at least 3 points (6 coordinates)
 
+    console.log('LassoTool: Checking element:', element.type, 'at position:', element.x, element.y);
+
     switch (element.type) {
       case 'rectangle':
-        // Check if all corners of the rectangle are inside the lasso
+        // Check if rectangle center or any corner is inside the lasso
+        const rectCenter = { x: element.x + element.width / 2, y: element.y + element.height / 2 };
         const corners = [
           { x: element.x, y: element.y },
           { x: element.x + element.width, y: element.y },
           { x: element.x + element.width, y: element.y + element.height },
           { x: element.x, y: element.y + element.height }
         ];
-        return corners.every(corner => this.isPointInPolygon(corner, lassoPoints));
+        const rectInside = this.isPointInPolygon(rectCenter, lassoPoints) || 
+                          corners.some(corner => this.isPointInPolygon(corner, lassoPoints));
+        console.log('LassoTool: Rectangle check - center:', rectCenter, 'inside:', rectInside);
+        return rectInside;
 
       case 'circle':
-        // Check if the circle center is inside and the circle doesn't extend outside
+        // Check if the circle center is inside the lasso
         const center = { x: element.x, y: element.y };
-        if (!this.isPointInPolygon(center, lassoPoints)) return false;
-        
-        // Check if circle edges are inside (simplified check)
-        const edgePoints = [
-          { x: element.x + element.radius, y: element.y },
-          { x: element.x - element.radius, y: element.y },
-          { x: element.x, y: element.y + element.radius },
-          { x: element.x, y: element.y - element.radius }
-        ];
-        return edgePoints.every(point => this.isPointInPolygon(point, lassoPoints));
+        const centerInside = this.isPointInPolygon(center, lassoPoints);
+        console.log('LassoTool: Circle check - center:', center, 'inside:', centerInside);
+        return centerInside;
 
       case 'line':
-        // Check if all line points are inside the lasso
+        // Check if any line points are inside the lasso
         const linePoints = [];
         for (let i = 0; i < element.points.length; i += 2) {
           linePoints.push({ x: element.points[i], y: element.points[i + 1] });
         }
-        return linePoints.some(point => this.isPointInPolygon(point, lassoPoints));
+        const lineInside = linePoints.some(point => this.isPointInPolygon(point, lassoPoints));
+        console.log('LassoTool: Line check - points:', linePoints, 'inside:', lineInside);
+        return lineInside;
 
       case 'text':
         // Check if text position is inside the lasso
-        return this.isPointInPolygon({ x: element.x, y: element.y }, lassoPoints);
+        const textPos = { x: element.x, y: element.y };
+        const textInside = this.isPointInPolygon(textPos, lassoPoints);
+        console.log('LassoTool: Text check - position:', textPos, 'inside:', textInside);
+        return textInside;
 
       case 'image':
-        // Check if all corners of the image are inside the lasso
+        // Check if image center or any corner is inside the lasso
+        const imgCenter = { x: element.x + element.width / 2, y: element.y + element.height / 2 };
         const imageCorners = [
           { x: element.x, y: element.y },
           { x: element.x + element.width, y: element.y },
           { x: element.x + element.width, y: element.y + element.height },
           { x: element.x, y: element.y + element.height }
         ];
-        return imageCorners.every(corner => this.isPointInPolygon(corner, lassoPoints));
+        const imgInside = this.isPointInPolygon(imgCenter, lassoPoints) || 
+                         imageCorners.some(corner => this.isPointInPolygon(corner, lassoPoints));
+        console.log('LassoTool: Image check - center:', imgCenter, 'inside:', imgInside);
+        return imgInside;
 
       default:
+        console.log('LassoTool: Unknown element type:', element.type);
         return false;
     }
   }
@@ -122,32 +131,36 @@ export default class LassoTool {
       }
     }
 
-    // Start lasso drawing
-    const pos = this.getTransformedPointerPosition(e.target.getStage());
-    if (!pos) return;
+    // Start lasso drawing only on empty area
+    if (clickedOnEmpty) {
+      const pos = this.getTransformedPointerPosition(e.target.getStage());
+      if (!pos) return;
 
-    this.isDrawing = true;
-    this.lassoPoints = [pos.x, pos.y];
-    
-    // Clear previous selection when starting new lasso
-    setSelectedElement(null);
+      console.log('LassoTool: Starting lasso at position:', pos);
+      this.isDrawing = true;
+      this.lassoPoints = [pos.x, pos.y];
+      
+      // Clear previous selection when starting new lasso
+      setSelectedElement(null);
 
-    // Create temporary lasso line for visual feedback
-    const newLassoLine = {
-      type: 'line',
-      id: 'temp-lasso-' + Date.now(),
-      points: this.lassoPoints,
-      stroke: '#007bff',
-      strokeWidth: 2,
-      lineCap: 'round',
-      lineJoin: 'round',
-      tension: 0.5,
-      dash: [5, 5], // Dashed line for lasso
-      globalCompositeOperation: 'source-over'
-    };
+      // Create temporary lasso line for visual feedback
+      const newLassoLine = {
+        type: 'line',
+        id: 'temp-lasso-' + Date.now(),
+        points: this.lassoPoints,
+        stroke: '#007bff',
+        strokeWidth: 2,
+        lineCap: 'round',
+        lineJoin: 'round',
+        tension: 0,
+        dash: [5, 5], // Dashed line for lasso
+        globalCompositeOperation: 'source-over'
+      };
 
-    this.context.addElement(newLassoLine);
-    this.lassoLine = newLassoLine;
+      console.log('LassoTool: Creating temporary lasso line:', newLassoLine);
+      const addedElement = this.context.addElement(newLassoLine);
+      this.lassoLine = addedElement || newLassoLine;
+    }
   }
 
   onMouseMove(e) {
@@ -158,6 +171,7 @@ export default class LassoTool {
     if (!point) return;
 
     this.lassoPoints = [...this.lassoPoints, point.x, point.y];
+    console.log('LassoTool: Adding point to lasso:', point, 'Total points:', this.lassoPoints.length / 2);
 
     // Update the temporary lasso line
     if (this.lassoLine) {
@@ -165,6 +179,7 @@ export default class LassoTool {
         ...this.lassoLine,
         points: this.lassoPoints
       };
+      console.log('LassoTool: Updating lasso line with points:', this.lassoPoints);
       this.context.updateElement(updatedLassoLine);
     }
   }
@@ -177,6 +192,7 @@ export default class LassoTool {
 
     // Remove the temporary lasso line
     if (this.lassoLine) {
+      console.log('LassoTool: Removing temporary lasso line:', this.lassoLine.id);
       this.context.deleteElement(this.lassoLine.id);
       this.lassoLine = null;
     }
@@ -184,31 +200,41 @@ export default class LassoTool {
     // Close the lasso by connecting to the first point
     if (this.lassoPoints.length >= 6) {
       this.lassoPoints.push(this.lassoPoints[0], this.lassoPoints[1]);
+      console.log('LassoTool: Closed lasso with points:', this.lassoPoints);
 
       // Find all elements inside the lasso
       const { pages, currentPage, setSelectedElement } = this.context;
       const currentPageElements = pages[currentPage] || [];
-      const selectedElements = currentPageElements.filter(element => 
-        element.id !== this.lassoLine?.id && // Exclude the lasso line itself
-        this.isElementInLasso(element, this.lassoPoints)
-      );
+      console.log('LassoTool: Checking', currentPageElements.length, 'elements for selection');
+      
+      const selectedElements = currentPageElements.filter(element => {
+        // Skip temporary lasso lines
+        if (element.id && element.id.startsWith('temp-lasso-')) {
+          return false;
+        }
+        const isInside = this.isElementInLasso(element, this.lassoPoints);
+        console.log('LassoTool: Element', element.id, element.type, 'is inside lasso:', isInside);
+        return isInside;
+      });
 
-      console.log('LassoTool: Found', selectedElements.length, 'elements in lasso');
+      console.log('LassoTool: Found', selectedElements.length, 'elements in lasso:', selectedElements);
 
       if (selectedElements.length === 1) {
         // If only one element is selected, select it for transformation
+        console.log('LassoTool: Selecting single element:', selectedElements[0]);
         setSelectedElement(selectedElements[0]);
       } else if (selectedElements.length > 1) {
         // For multiple elements, we'll select the first one for now
-        // In the future, this could be enhanced to support multi-selection
-        setSelectedElement(selectedElements[0]);
         console.log('LassoTool: Multiple elements selected, selecting first one:', selectedElements[0]);
+        setSelectedElement(selectedElements[0]);
         
         // Show a notification about multiple selection
         this.showMultiSelectionNotification(selectedElements.length);
       } else {
         console.log('LassoTool: No elements found in lasso selection');
       }
+    } else {
+      console.log('LassoTool: Not enough points for lasso selection:', this.lassoPoints.length);
     }
 
     // Reset lasso points
