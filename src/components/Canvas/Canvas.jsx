@@ -191,6 +191,158 @@ const Canvas = () => {
       setSelectedElement(element);
     }
   };
+
+  const handleTextDoubleClick = (element) => {
+    console.log('Text double-clicked:', element);
+    
+    // Create a more user-friendly text editing experience
+    const textarea = document.createElement('textarea');
+    textarea.value = element.text;
+    textarea.style.position = 'fixed';
+    textarea.style.top = '50%';
+    textarea.style.left = '50%';
+    textarea.style.transform = 'translate(-50%, -50%)';
+    textarea.style.zIndex = '10000';
+    textarea.style.padding = '10px';
+    textarea.style.fontSize = '16px';
+    textarea.style.fontFamily = element.fontFamily || 'Arial';
+    textarea.style.border = '2px solid #3b82f6';
+    textarea.style.borderRadius = '8px';
+    textarea.style.resize = 'both';
+    textarea.style.minWidth = '300px';
+    textarea.style.minHeight = '100px';
+    textarea.style.backgroundColor = 'white';
+    textarea.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+    
+    // Add overlay
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    overlay.style.zIndex = '9999';
+    
+    document.body.appendChild(overlay);
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    
+    const handleSave = () => {
+      const newText = textarea.value.trim();
+      if (newText !== '' && newText !== element.text) {
+        const updatedElement = {
+          ...element,
+          text: newText
+        };
+        updateElement(updatedElement);
+        if (context.saveToHistory) {
+          context.saveToHistory();
+        }
+      }
+      document.body.removeChild(textarea);
+      document.body.removeChild(overlay);
+    };
+    
+    const handleCancel = () => {
+      document.body.removeChild(textarea);
+      document.body.removeChild(overlay);
+    };
+    
+    // Handle keyboard events
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancel();
+      }
+    });
+    
+    // Handle click outside
+    overlay.addEventListener('click', handleCancel);
+  };
+
+  const handleCopyText = (element) => {
+    if (element.type === 'text') {
+      navigator.clipboard.writeText(element.text).then(() => {
+        console.log('Text copied to clipboard:', element.text);
+        
+        // Show visual feedback
+        const notification = document.createElement('div');
+        notification.textContent = 'Text copied to clipboard!';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#10b981';
+        notification.style.color = 'white';
+        notification.style.padding = '12px 20px';
+        notification.style.borderRadius = '8px';
+        notification.style.zIndex = '10000';
+        notification.style.fontSize = '14px';
+        notification.style.fontFamily = 'Arial, sans-serif';
+        notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+        notification.style.animation = 'slideIn 0.3s ease-out';
+        
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+          @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+          @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+          }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+          notification.style.animation = 'slideOut 0.3s ease-in';
+          setTimeout(() => {
+            if (document.body.contains(notification)) {
+              document.body.removeChild(notification);
+            }
+            if (document.head.contains(style)) {
+              document.head.removeChild(style);
+            }
+          }, 300);
+        }, 3000);
+        
+      }).catch(err => {
+        console.error('Failed to copy text:', err);
+        
+        // Show error feedback
+        const notification = document.createElement('div');
+        notification.textContent = 'Failed to copy text';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#ef4444';
+        notification.style.color = 'white';
+        notification.style.padding = '12px 20px';
+        notification.style.borderRadius = '8px';
+        notification.style.zIndex = '10000';
+        notification.style.fontSize = '14px';
+        notification.style.fontFamily = 'Arial, sans-serif';
+        notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+          }
+        }, 3000);
+      });
+    }
+  };
   
   const renderElement = (element) => {
     console.log('Canvas: rendering element:', element.type, 'with dimensions:', 
@@ -320,7 +472,14 @@ const Canvas = () => {
             align={element.align}
             verticalAlign={element.verticalAlign}
             rotation={element.rotation || 0}
+            scaleX={element.scaleX || 1}
+            scaleY={element.scaleY || 1}
             onClick={() => handleElementClick(element)}
+            onDblClick={() => handleTextDoubleClick(element)}
+            onContextMenu={(e) => {
+              e.evt.preventDefault();
+              handleCopyText(element);
+            }}
             draggable={tool === 'transform' && selectedElement?.id === element.id}
             onDragEnd={(e) => {
               if (tool === 'transform') {
@@ -328,6 +487,23 @@ const Canvas = () => {
                   ...element,
                   x: e.target.x(),
                   y: e.target.y()
+                };
+                updateElement(updatedElement);
+                if (context.saveToHistory) {
+                  context.saveToHistory();
+                }
+              }
+            }}
+            onTransformEnd={(e) => {
+              if (tool === 'transform') {
+                const node = e.target;
+                const updatedElement = {
+                  ...element,
+                  x: node.x(),
+                  y: node.y(),
+                  rotation: node.rotation(),
+                  scaleX: node.scaleX(),
+                  scaleY: node.scaleY()
                 };
                 updateElement(updatedElement);
                 if (context.saveToHistory) {

@@ -4,6 +4,11 @@ export default class TextTool {
     this.isEditing = false;
   }
 
+  // Helper function to generate unique ID
+  generateId() {
+    return 'text_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
   // Helper function to get transformed mouse position accounting for pan and zoom
   getTransformedPointerPosition(stage) {
     const { position, scale } = this.context;
@@ -28,6 +33,7 @@ export default class TextTool {
     if (!text || text.trim() === '') return;
 
     const newElement = {
+      id: this.generateId(),
       type: 'text',
       x: pos.x,
       y: pos.y,
@@ -36,7 +42,10 @@ export default class TextTool {
       fontFamily: 'Arial',
       fill: color,
       align: 'left',
-      verticalAlign: 'top'
+      verticalAlign: 'top',
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1
     };
     
     this.context.addElement(newElement);
