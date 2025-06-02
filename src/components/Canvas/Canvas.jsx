@@ -196,6 +196,9 @@ const Canvas = () => {
     console.log('Text double-clicked:', element);
     console.log('Current tool:', tool);
     
+    // Detect if it's a touch device
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
     // Create a more user-friendly text editing experience
     const textarea = document.createElement('textarea');
     textarea.value = element.text;
@@ -204,32 +207,71 @@ const Canvas = () => {
     textarea.style.left = '50%';
     textarea.style.transform = 'translate(-50%, -50%)';
     textarea.style.zIndex = '10000';
-    textarea.style.padding = '15px';
-    textarea.style.fontSize = '16px';
+    textarea.style.padding = isTouchDevice ? '20px' : '15px';
+    textarea.style.fontSize = isTouchDevice ? '18px' : '16px';
     textarea.style.fontFamily = element.fontFamily || 'Arial';
     textarea.style.border = '2px solid #3b82f6';
     textarea.style.borderRadius = '8px';
     textarea.style.resize = 'both';
-    textarea.style.minWidth = '300px';
-    textarea.style.minHeight = '100px';
+    textarea.style.minWidth = isTouchDevice ? '80vw' : '300px';
+    textarea.style.minHeight = isTouchDevice ? '150px' : '100px';
+    textarea.style.maxWidth = isTouchDevice ? '90vw' : '500px';
     textarea.style.backgroundColor = 'white';
     textarea.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
     textarea.style.outline = 'none';
     
+    // Add save and cancel buttons for touch devices
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.position = 'fixed';
+    buttonContainer.style.top = 'calc(50% + 100px)';
+    buttonContainer.style.left = '50%';
+    buttonContainer.style.transform = 'translateX(-50%)';
+    buttonContainer.style.zIndex = '10001';
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.gap = '10px';
+    
+    const saveButton = document.createElement('button');
+    saveButton.textContent = 'Save';
+    saveButton.style.padding = isTouchDevice ? '12px 24px' : '8px 16px';
+    saveButton.style.fontSize = isTouchDevice ? '16px' : '14px';
+    saveButton.style.backgroundColor = '#3b82f6';
+    saveButton.style.color = 'white';
+    saveButton.style.border = 'none';
+    saveButton.style.borderRadius = '6px';
+    saveButton.style.cursor = 'pointer';
+    saveButton.style.minWidth = isTouchDevice ? '80px' : '60px';
+    
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = 'Cancel';
+    cancelButton.style.padding = isTouchDevice ? '12px 24px' : '8px 16px';
+    cancelButton.style.fontSize = isTouchDevice ? '16px' : '14px';
+    cancelButton.style.backgroundColor = '#6b7280';
+    cancelButton.style.color = 'white';
+    cancelButton.style.border = 'none';
+    cancelButton.style.borderRadius = '6px';
+    cancelButton.style.cursor = 'pointer';
+    cancelButton.style.minWidth = isTouchDevice ? '80px' : '60px';
+    
+    buttonContainer.appendChild(saveButton);
+    buttonContainer.appendChild(cancelButton);
+    
     // Add instructions
     const instructions = document.createElement('div');
-    instructions.textContent = 'Ctrl+Enter to save, Escape to cancel';
+    instructions.textContent = isTouchDevice ? 
+      'Tap Save to confirm or Cancel to discard changes' : 
+      'Ctrl+Enter to save, Escape to cancel';
     instructions.style.position = 'fixed';
-    instructions.style.top = 'calc(50% + 80px)';
+    instructions.style.top = isTouchDevice ? 'calc(50% + 160px)' : 'calc(50% + 80px)';
     instructions.style.left = '50%';
     instructions.style.transform = 'translateX(-50%)';
     instructions.style.zIndex = '10001';
-    instructions.style.fontSize = '12px';
+    instructions.style.fontSize = isTouchDevice ? '14px' : '12px';
     instructions.style.color = '#666';
     instructions.style.backgroundColor = 'white';
     instructions.style.padding = '5px 10px';
     instructions.style.borderRadius = '4px';
     instructions.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+    instructions.style.textAlign = 'center';
     
     // Add overlay
     const overlay = document.createElement('div');
@@ -243,6 +285,7 @@ const Canvas = () => {
     
     document.body.appendChild(overlay);
     document.body.appendChild(textarea);
+    document.body.appendChild(buttonContainer);
     document.body.appendChild(instructions);
     textarea.focus();
     textarea.select();
@@ -272,9 +315,14 @@ const Canvas = () => {
       if (document.body.contains(textarea)) document.body.removeChild(textarea);
       if (document.body.contains(overlay)) document.body.removeChild(overlay);
       if (document.body.contains(instructions)) document.body.removeChild(instructions);
+      if (document.body.contains(buttonContainer)) document.body.removeChild(buttonContainer);
     };
     
-    // Handle keyboard events
+    // Add button event listeners
+    saveButton.addEventListener('click', handleSave);
+    cancelButton.addEventListener('click', handleCancel);
+    
+    // Handle keyboard events (for desktop)
     textarea.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && e.ctrlKey) {
         e.preventDefault();
@@ -285,8 +333,12 @@ const Canvas = () => {
       }
     });
     
-    // Handle click outside
-    overlay.addEventListener('click', handleCancel);
+    // Handle click outside (only if not clicking on buttons)
+    overlay.addEventListener('click', (e) => {
+      if (!buttonContainer.contains(e.target)) {
+        handleCancel();
+      }
+    });
   };
 
   const handleCopyText = (element) => {
@@ -366,6 +418,98 @@ const Canvas = () => {
         }, 3000);
       });
     }
+  };
+  
+  const handleTextTouch = (element) => {
+    let touchTimer = null;
+    let touchStartTime = 0;
+    let feedbackElement = null;
+    
+    const handleTouchStart = (e) => {
+      touchStartTime = Date.now();
+      
+      // Create visual feedback for long press
+      feedbackElement = document.createElement('div');
+      feedbackElement.textContent = 'Hold to edit text...';
+      feedbackElement.style.position = 'fixed';
+      feedbackElement.style.top = '20px';
+      feedbackElement.style.left = '50%';
+      feedbackElement.style.transform = 'translateX(-50%)';
+      feedbackElement.style.backgroundColor = 'rgba(59, 130, 246, 0.9)';
+      feedbackElement.style.color = 'white';
+      feedbackElement.style.padding = '8px 16px';
+      feedbackElement.style.borderRadius = '20px';
+      feedbackElement.style.fontSize = '14px';
+      feedbackElement.style.zIndex = '9999';
+      feedbackElement.style.pointerEvents = 'none';
+      feedbackElement.style.opacity = '0';
+      feedbackElement.style.transition = 'opacity 0.3s ease';
+      
+      document.body.appendChild(feedbackElement);
+      
+      // Show feedback after a short delay
+      setTimeout(() => {
+        if (feedbackElement && document.body.contains(feedbackElement)) {
+          feedbackElement.style.opacity = '1';
+        }
+      }, 100);
+      
+      touchTimer = setTimeout(() => {
+        // Long press detected (500ms)
+        console.log('Long press detected on text:', element);
+        
+        // Update feedback
+        if (feedbackElement && document.body.contains(feedbackElement)) {
+          feedbackElement.textContent = 'Opening editor...';
+          feedbackElement.style.backgroundColor = 'rgba(34, 197, 94, 0.9)';
+        }
+        
+        // Small delay to show the "opening" message
+        setTimeout(() => {
+          handleTextDoubleClick(element);
+          cleanupFeedback();
+        }, 200);
+      }, 500);
+    };
+    
+    const cleanupFeedback = () => {
+      if (feedbackElement && document.body.contains(feedbackElement)) {
+        feedbackElement.style.opacity = '0';
+        setTimeout(() => {
+          if (feedbackElement && document.body.contains(feedbackElement)) {
+            document.body.removeChild(feedbackElement);
+          }
+        }, 300);
+      }
+    };
+    
+    const handleTouchEnd = (e) => {
+      const touchDuration = Date.now() - touchStartTime;
+      if (touchTimer) {
+        clearTimeout(touchTimer);
+      }
+      
+      cleanupFeedback();
+      
+      // If it was a quick tap (less than 200ms), treat as regular click
+      if (touchDuration < 200) {
+        handleElementClick(element);
+      }
+    };
+    
+    const handleTouchMove = (e) => {
+      // Cancel long press if user moves finger
+      if (touchTimer) {
+        clearTimeout(touchTimer);
+      }
+      cleanupFeedback();
+    };
+    
+    return {
+      onTouchStart: handleTouchStart,
+      onTouchEnd: handleTouchEnd,
+      onTouchMove: handleTouchMove
+    };
   };
   
   const renderElement = (element) => {
@@ -483,6 +627,7 @@ const Canvas = () => {
           />
         );
       case 'text':
+        const touchHandlers = handleTextTouch(element);
         return (
           <Text
             key={element.id}
@@ -503,6 +648,9 @@ const Canvas = () => {
               e.evt.stopPropagation();
               handleTextDoubleClick(element);
             }}
+            onTouchStart={touchHandlers.onTouchStart}
+            onTouchEnd={touchHandlers.onTouchEnd}
+            onTouchMove={touchHandlers.onTouchMove}
             onContextMenu={(e) => {
               e.evt.preventDefault();
               e.evt.stopPropagation();
