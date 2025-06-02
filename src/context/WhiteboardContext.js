@@ -1,6 +1,6 @@
 import React, { createContext, useEffect, useRef, useState } from 'react';
+import io from 'socket.io-client';
 import { v4 as uuidv4 } from 'uuid';
-import { getSocket } from '../services/socket';
 
 export const WhiteboardContext = createContext();
 
@@ -82,105 +82,50 @@ export const WhiteboardProvider = ({ children }) => {
     }
   }, [history, historyIndex]);
 
+  // Initialize socket connection
   useEffect(() => {
     console.log('WhiteboardContext: Initializing socket connection...');
-    let keepAliveInterval;
     
-    try {
-      socket.current = getSocket();
-      
-      if (!socket.current) {
-        console.error('WhiteboardContext: Failed to get socket instance');
-        return;
-      }
-      
-      console.log('WhiteboardContext: Socket instance created:', socket.current);
-      
-      socket.current.on('connect', () => {
-        console.log('WhiteboardContext: Connected to server with ID:', socket.current.id);
-        console.log('WhiteboardContext: Socket connected successfully!');
-      });
-
-      socket.current.on('connect_error', (error) => {
-        console.error('WhiteboardContext: Socket connection error:', error);
-        console.error('WhiteboardContext: Error details:', error.message);
-        console.error('WhiteboardContext: Error type:', error.type);
-      });
-
-      socket.current.on('disconnect', (reason) => {
-        console.log('WhiteboardContext: Socket disconnected:', reason);
-      });
-
-      socket.current.on('element-update', (data) => {
-        console.log('WhiteboardContext: Received element-update:', data);
-        if (data.userId !== userId.current) {
-          console.log('WhiteboardContext: Processing element update from another user');
-          updateElementsFromSocket(data);
-        } else {
-          console.log('WhiteboardContext: Ignoring own element update');
-        }
-      });
-
-      socket.current.on('page-change', (data) => {
-        console.log('WhiteboardContext: Received page-change:', data);
-        if (data.userId !== userId.current) {
-          console.log('WhiteboardContext: Processing page change from another user');
-          // Only update the pages data, don't force current user to change pages
-          setPages(prevPages => {
-            const updatedPages = { ...prevPages };
-            // Merge the received pages with existing pages
-            Object.keys(data.pages).forEach(pageNum => {
-              updatedPages[pageNum] = data.pages[pageNum];
-            });
-            return updatedPages;
-          });
-        } else {
-          console.log('WhiteboardContext: Ignoring own page change');
-        }
-      });
-
-      // Keep-alive ping for mobile devices
-      keepAliveInterval = setInterval(() => {
-        if (socket.current && socket.current.connected) {
-          socket.current.emit('ping');
-        }
-      }, 25000); // Ping every 25 seconds
-
-      // Test socket connection with more detailed logging
-      setTimeout(() => {
-        if (socket.current) {
-          console.log('WhiteboardContext: Socket connection test...');
-          console.log('WhiteboardContext: Socket exists?', !!socket.current);
-          console.log('WhiteboardContext: Socket connected?', socket.current.connected);
-          console.log('WhiteboardContext: Socket ID:', socket.current.id);
-          console.log('WhiteboardContext: User ID:', userId.current);
-          
-          if (socket.current.connected) {
-            console.log('WhiteboardContext: Socket connection test - ✅ CONNECTED');
-          } else {
-            console.error('WhiteboardContext: Socket connection test - ❌ NOT CONNECTED');
-            console.log('WhiteboardContext: Attempting to reconnect...');
-            socket.current.connect();
-          }
-        } else {
-          console.error('WhiteboardContext: Socket instance is null');
-        }
-      }, 2000);
-      
-    } catch (error) {
-      console.error('WhiteboardContext: Error initializing socket:', error);
-    }
-
+    socket.current = io('https://lcc360-us.onrender.com', {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true
+    });
+    
+    socket.current.on('connect', () => {
+      console.log('WhiteboardContext: Connected to server');
+      userId.current = socket.current.id;
+    });
+    
+    socket.current.on('disconnect', () => {
+      console.log('WhiteboardContext: Disconnected from server');
+    });
+    
+    socket.current.on('element-update', handleSocketMessage);
+    socket.current.on('page-change', handlePageChange);
+    
     return () => {
-      if (keepAliveInterval) {
-        clearInterval(keepAliveInterval);
-      }
+      console.log('WhiteboardContext: Cleaning up socket connection...');
       if (socket.current) {
-        console.log('WhiteboardContext: Disconnecting socket...');
         socket.current.disconnect();
       }
     };
   }, []);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Delete' && selectedElement) {
+        deleteSelectedElement();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedElement, deleteSelectedElement]);
 
   const updateElementsFromSocket = (data) => {
     console.log('WhiteboardContext: updateElementsFromSocket called with:', data);
@@ -237,6 +182,22 @@ export const WhiteboardProvider = ({ children }) => {
           updatedPages[data.page] = [];
           console.log('WhiteboardContext: Cleared page', data.page);
         }
+        return updatedPages;
+      });
+    } else if (data.type === 'page-delete') {
+      setPages(prevPages => {
+        const updatedPages = { ...prevPages };
+        delete updatedPages[data.pageNumber];
+        
+        // If we're on the deleted page, switch to another page
+        if (data.pageNumber === currentPage) {
+          const remainingPages = Object.keys(updatedPages).map(p => parseInt(p)).sort((a, b) => a - b);
+          const newCurrentPage = remainingPages[0] || 1;
+          setCurrentPage(newCurrentPage);
+          setSelectedElement(null);
+        }
+        
+        console.log('WhiteboardContext: Deleted page', data.pageNumber);
         return updatedPages;
       });
     }
@@ -395,6 +356,58 @@ export const WhiteboardProvider = ({ children }) => {
     });
   };
 
+  const deleteSelectedElement = () => {
+    if (selectedElement) {
+      deleteElement(selectedElement.id);
+      setSelectedElement(null);
+    }
+  };
+
+  const deletePage = (pageNumber) => {
+    if (Object.keys(pages).length <= 1) {
+      console.log('Cannot delete the last page');
+      return;
+    }
+
+    setPages(prevPages => {
+      const updatedPages = { ...prevPages };
+      delete updatedPages[pageNumber];
+      
+      // If we're deleting the current page, switch to another page
+      let newCurrentPage = currentPage;
+      if (pageNumber === currentPage) {
+        const remainingPages = Object.keys(updatedPages).map(p => parseInt(p)).sort((a, b) => a - b);
+        newCurrentPage = remainingPages[0] || 1;
+      }
+      
+      // Add to history
+      const newHistory = [...history.slice(0, historyIndex + 1), {
+        pages: updatedPages,
+        currentPage: newCurrentPage
+      }];
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+      
+      // Update current page if needed
+      if (newCurrentPage !== currentPage) {
+        setCurrentPage(newCurrentPage);
+      }
+      
+      // Clear selected element if it was on the deleted page
+      if (pageNumber === currentPage) {
+        setSelectedElement(null);
+      }
+      
+      // Emit to socket
+      socket.current.emit('page-delete', {
+        pageNumber,
+        userId: userId.current
+      });
+      
+      return updatedPages;
+    });
+  };
+
   const changePage = (pageNumber) => {
     console.log('WhiteboardContext: changing page from', currentPage, 'to', pageNumber);
     console.log('WhiteboardContext: current page elements before change:', pages[currentPage]);
@@ -513,7 +526,9 @@ export const WhiteboardProvider = ({ children }) => {
         setPosition,
         canUndo: historyIndex > 0,
         canRedo: historyIndex < history.length - 1,
-        clearStorage
+        clearStorage,
+        deleteSelectedElement,
+        deletePage
       }}
     >
       {children}

@@ -63,7 +63,9 @@ const Toolbar = () => {
     undo, 
     redo, 
     canUndo, 
-    canRedo 
+    canRedo,
+    selectedElement,
+    deleteSelectedElement
   } = context;
   
   const fileInputRef = useRef(null);
@@ -209,8 +211,9 @@ const Toolbar = () => {
         
         <button 
           className="tool-button"
-          onClick={clearPage}
-          title="Clear Page"
+          onClick={deleteSelectedElement}
+          disabled={!selectedElement}
+          title={selectedElement ? "Delete Selected" : "Select an object to delete"}
         >
           <ToolIcon tool="trash" />
         </button>
