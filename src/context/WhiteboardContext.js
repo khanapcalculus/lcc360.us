@@ -20,6 +20,68 @@ export const WhiteboardProvider = ({ children }) => {
   const socket = useRef(null);
   const userId = useRef(uuidv4());
 
+  // Load saved data on component mount
+  useEffect(() => {
+    const loadSavedData = () => {
+      try {
+        const savedPages = localStorage.getItem('whiteboard-pages');
+        const savedCurrentPage = localStorage.getItem('whiteboard-current-page');
+        const savedHistory = localStorage.getItem('whiteboard-history');
+        const savedHistoryIndex = localStorage.getItem('whiteboard-history-index');
+        
+        if (savedPages) {
+          const parsedPages = JSON.parse(savedPages);
+          setPages(parsedPages);
+          console.log('WhiteboardContext: Loaded saved pages:', parsedPages);
+        }
+        
+        if (savedCurrentPage) {
+          const parsedCurrentPage = parseInt(savedCurrentPage);
+          setCurrentPage(parsedCurrentPage);
+          console.log('WhiteboardContext: Loaded saved current page:', parsedCurrentPage);
+        }
+        
+        if (savedHistory) {
+          const parsedHistory = JSON.parse(savedHistory);
+          setHistory(parsedHistory);
+          console.log('WhiteboardContext: Loaded saved history');
+        }
+        
+        if (savedHistoryIndex) {
+          const parsedHistoryIndex = parseInt(savedHistoryIndex);
+          setHistoryIndex(parsedHistoryIndex);
+          console.log('WhiteboardContext: Loaded saved history index:', parsedHistoryIndex);
+        }
+      } catch (error) {
+        console.error('WhiteboardContext: Error loading saved data:', error);
+      }
+    };
+    
+    loadSavedData();
+  }, []);
+
+  // Save data whenever pages change
+  useEffect(() => {
+    try {
+      localStorage.setItem('whiteboard-pages', JSON.stringify(pages));
+      localStorage.setItem('whiteboard-current-page', currentPage.toString());
+      console.log('WhiteboardContext: Saved pages and current page to localStorage');
+    } catch (error) {
+      console.error('WhiteboardContext: Error saving pages to localStorage:', error);
+    }
+  }, [pages, currentPage]);
+
+  // Save history whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('whiteboard-history', JSON.stringify(history));
+      localStorage.setItem('whiteboard-history-index', historyIndex.toString());
+      console.log('WhiteboardContext: Saved history to localStorage');
+    } catch (error) {
+      console.error('WhiteboardContext: Error saving history to localStorage:', error);
+    }
+  }, [history, historyIndex]);
+
   useEffect(() => {
     console.log('WhiteboardContext: Initializing socket connection...');
     let keepAliveInterval;
@@ -409,6 +471,18 @@ export const WhiteboardProvider = ({ children }) => {
     }
   };
 
+  const clearStorage = () => {
+    try {
+      localStorage.removeItem('whiteboard-pages');
+      localStorage.removeItem('whiteboard-current-page');
+      localStorage.removeItem('whiteboard-history');
+      localStorage.removeItem('whiteboard-history-index');
+      console.log('WhiteboardContext: Cleared all localStorage data');
+    } catch (error) {
+      console.error('WhiteboardContext: Error clearing localStorage:', error);
+    }
+  };
+
   return (
     <WhiteboardContext.Provider
       value={{
@@ -438,7 +512,8 @@ export const WhiteboardProvider = ({ children }) => {
         position,
         setPosition,
         canUndo: historyIndex > 0,
-        canRedo: historyIndex < history.length - 1
+        canRedo: historyIndex < history.length - 1,
+        clearStorage
       }}
     >
       {children}

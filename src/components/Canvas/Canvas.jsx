@@ -194,6 +194,7 @@ const Canvas = () => {
 
   const handleTextDoubleClick = (element) => {
     console.log('Text double-clicked:', element);
+    console.log('Current tool:', tool);
     
     // Create a more user-friendly text editing experience
     const textarea = document.createElement('textarea');
@@ -203,7 +204,7 @@ const Canvas = () => {
     textarea.style.left = '50%';
     textarea.style.transform = 'translate(-50%, -50%)';
     textarea.style.zIndex = '10000';
-    textarea.style.padding = '10px';
+    textarea.style.padding = '15px';
     textarea.style.fontSize = '16px';
     textarea.style.fontFamily = element.fontFamily || 'Arial';
     textarea.style.border = '2px solid #3b82f6';
@@ -213,6 +214,22 @@ const Canvas = () => {
     textarea.style.minHeight = '100px';
     textarea.style.backgroundColor = 'white';
     textarea.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+    textarea.style.outline = 'none';
+    
+    // Add instructions
+    const instructions = document.createElement('div');
+    instructions.textContent = 'Ctrl+Enter to save, Escape to cancel';
+    instructions.style.position = 'fixed';
+    instructions.style.top = 'calc(50% + 80px)';
+    instructions.style.left = '50%';
+    instructions.style.transform = 'translateX(-50%)';
+    instructions.style.zIndex = '10001';
+    instructions.style.fontSize = '12px';
+    instructions.style.color = '#666';
+    instructions.style.backgroundColor = 'white';
+    instructions.style.padding = '5px 10px';
+    instructions.style.borderRadius = '4px';
+    instructions.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
     
     // Add overlay
     const overlay = document.createElement('div');
@@ -226,6 +243,7 @@ const Canvas = () => {
     
     document.body.appendChild(overlay);
     document.body.appendChild(textarea);
+    document.body.appendChild(instructions);
     textarea.focus();
     textarea.select();
     
@@ -236,18 +254,24 @@ const Canvas = () => {
           ...element,
           text: newText
         };
+        console.log('Saving updated text element:', updatedElement);
         updateElement(updatedElement);
         if (context.saveToHistory) {
           context.saveToHistory();
         }
       }
-      document.body.removeChild(textarea);
-      document.body.removeChild(overlay);
+      cleanup();
     };
     
     const handleCancel = () => {
-      document.body.removeChild(textarea);
-      document.body.removeChild(overlay);
+      console.log('Text editing cancelled');
+      cleanup();
+    };
+    
+    const cleanup = () => {
+      if (document.body.contains(textarea)) document.body.removeChild(textarea);
+      if (document.body.contains(overlay)) document.body.removeChild(overlay);
+      if (document.body.contains(instructions)) document.body.removeChild(instructions);
     };
     
     // Handle keyboard events
@@ -475,9 +499,13 @@ const Canvas = () => {
             scaleX={element.scaleX || 1}
             scaleY={element.scaleY || 1}
             onClick={() => handleElementClick(element)}
-            onDblClick={() => handleTextDoubleClick(element)}
+            onDblClick={(e) => {
+              e.evt.stopPropagation();
+              handleTextDoubleClick(element);
+            }}
             onContextMenu={(e) => {
               e.evt.preventDefault();
+              e.evt.stopPropagation();
               handleCopyText(element);
             }}
             draggable={tool === 'transform' && selectedElement?.id === element.id}
