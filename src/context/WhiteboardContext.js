@@ -21,7 +21,9 @@ export const WhiteboardProvider = ({ children }) => {
   const socket = useRef(null);
   const userId = useRef(uuidv4());
   const updateThrottle = useRef(null);
+  const updateCount = useRef(new Map()); // Track update count per element
   const isDebug = process.env.NODE_ENV === 'development';
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
   // Load saved data on component mount
   useEffect(() => {
@@ -340,6 +342,9 @@ export const WhiteboardProvider = ({ children }) => {
     const newElement = { ...element, id: uuidv4() };
     console.log('WhiteboardContext: Created new element with ID:', newElement.id);
     
+    // Reset update counter for new element
+    updateCount.current.set(newElement.id, 0);
+    
     setPages(prevPages => {
       const updatedPages = { ...prevPages };
       
@@ -368,7 +373,7 @@ export const WhiteboardProvider = ({ children }) => {
       setHistory(newHistory);
       setHistoryIndex(newHistory.length - 1);
       
-      // Emit to socket
+      // Emit to socket IMMEDIATELY for instant feedback
       if (socket.current) {
         console.log('WhiteboardContext: Emitting element-update to socket');
         console.log('WhiteboardContext: Socket connected?', socket.current.connected);
@@ -411,25 +416,44 @@ export const WhiteboardProvider = ({ children }) => {
       
       // Don't add to history during drawing - only when drawing is complete
       
-      // Throttle socket emissions to improve performance
-      if (updateThrottle.current) {
-        clearTimeout(updateThrottle.current);
-      }
+      // Smart throttling: send first few updates immediately, then throttle
+      const elementId = updatedElement.id;
+      const currentCount = updateCount.current.get(elementId) || 0;
+      updateCount.current.set(elementId, currentCount + 1);
       
-      updateThrottle.current = setTimeout(() => {
-        // Emit to socket
+      // Send first 5 updates immediately for instant feedback
+      if (currentCount < 5) {
+        // Emit immediately for first few updates
         if (socket.current && socket.current.connected) {
-          if (isDebug) console.log('WhiteboardContext: Emitting element update to socket:', updatedElement.id);
+          if (isDebug) console.log('WhiteboardContext: Emitting immediate element update:', updatedElement.id, 'count:', currentCount);
           socket.current.emit('element-update', {
             type: 'update',
             page: currentPage,
             element: updatedElement,
             userId: userId.current
           });
-        } else {
-          console.error('WhiteboardContext: Socket not connected for element update');
         }
-      }, 16); // ~60fps throttling
+      } else {
+        // Throttle subsequent updates
+        if (updateThrottle.current) {
+          clearTimeout(updateThrottle.current);
+        }
+        
+        updateThrottle.current = setTimeout(() => {
+          // Emit to socket
+          if (socket.current && socket.current.connected) {
+            if (isDebug) console.log('WhiteboardContext: Emitting throttled element update:', updatedElement.id);
+            socket.current.emit('element-update', {
+              type: 'update',
+              page: currentPage,
+              element: updatedElement,
+              userId: userId.current
+            });
+          } else {
+            console.error('WhiteboardContext: Socket not connected for element update');
+          }
+        }, isTouchDevice ? 8 : 16); // Faster throttling for touch devices
+      }
       
       return updatedPages;
     });
@@ -444,6 +468,10 @@ export const WhiteboardProvider = ({ children }) => {
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
     console.log('WhiteboardContext: Saved to history, index:', newHistory.length - 1);
+    
+    // Clear update counters when drawing is complete
+    updateCount.current.clear();
+    if (isDebug) console.log('WhiteboardContext: Cleared update counters');
   };
 
   const clearPage = () => {

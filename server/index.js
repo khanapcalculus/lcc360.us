@@ -58,8 +58,17 @@ io.on('connection', (socket) => {
     if (data.type === 'test') {
       console.log('🧪 Test message received:', data.message);
     }
-    // Broadcast immediately without delay
-    socket.broadcast.emit('element-update', data);
+    
+    // Prioritize drawing updates for instant feedback
+    if (data.type === 'add' || data.type === 'update') {
+      // Use setImmediate for drawing updates to prioritize them
+      setImmediate(() => {
+        socket.broadcast.emit('element-update', data);
+      });
+    } else {
+      // Regular broadcasting for other types
+      socket.broadcast.emit('element-update', data);
+    }
   });
   
   socket.on('page-change', (data) => {
